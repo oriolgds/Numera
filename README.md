@@ -7,20 +7,22 @@ Numera es una aplicación Flutter que permite contar y clasificar objetos en im�
 ## 🎯 Funcionalidades
 
 - **📷 Captura de imágenes**: Toma fotos directamente con la cámara o carga imágenes desde la galería
-- **🔍 Detección automática**: Identifica y cuenta objetos utilizando modelos de TensorFlow Lite
+- **🔍 Detección automática**: Identifica y cuenta objetos utilizando modelos de TensorFlow Lite optimizados
 - **📊 Clasificación inteligente**: Agrupa objetos por categorías con niveles de confianza
 - **📱 Completamente offline**: Todo el procesamiento se realiza en el dispositivo
 - **📝 Historial de análisis**: Guarda y revisa análisis anteriores
 - **🎨 Diseño moderno**: Interfaz minimalista con Material Design 3
+- **🎯 Detección precisa**: Soporte para modelos COCO SSD con 90+ categorías de objetos
 
 ## 🛠️ Tecnologías
 
 - **Frontend**: Flutter (Dart)
-- **IA/ML**: TensorFlow Lite para Flutter
+- **IA/ML**: TensorFlow Lite para Flutter con soporte nativo para modelos SSD
 - **Estado**: Provider
 - **Base de datos**: SQLite
-- **Cámara**: Camera & Image Picker plugins
+- **Cámara**: Camera (v0.10.5+5) & Image Picker plugins
 - **UI**: Material Design 3 con Google Fonts
+- **Procesamiento**: Optimización de imágenes con formato uint8 para máximo rendimiento
 
 ## 🎨 Paleta de Colores
 

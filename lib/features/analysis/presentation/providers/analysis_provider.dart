@@ -27,11 +27,14 @@ class AnalysisProvider extends ChangeNotifier {
         print('✅ Modelo de IA inicializado correctamente');
       } else {
         print('❌ Error al inicializar el modelo de IA');
+        _error = 'No se pudo inicializar el modelo de IA';
       }
     } catch (e) {
       print('❌ Error al inicializar el modelo: $e');
       _isModelInitialized = false;
+      _error = 'Error al cargar el modelo: $e';
     }
+    notifyListeners();
   }
 
   Future<void> analyzeImage(String imagePath) async {
@@ -42,12 +45,17 @@ class AnalysisProvider extends ChangeNotifier {
 
     try {
       if (!_isModelInitialized) {
-        throw Exception(
-            'El modelo de IA no está inicializado. Intenta reiniciar la app.');
+        await _initializeModel();
+        if (!_isModelInitialized) {
+          throw Exception('El modelo de IA no se pudo inicializar');
+        }
       }
+
+      print('🔍 Iniciando análisis de imagen: $imagePath');
 
       // Usar TensorFlow Lite para análisis real
       final detections = await _tfliteService.detectObjects(imagePath);
+      print('🔍 Detecciones obtenidas: ${detections.length}');
 
       // Contar objetos por categoría
       final objectCounts = _tfliteService.countObjectsByCategory(detections);

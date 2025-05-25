@@ -15,7 +15,7 @@ dependencies:
   google_fonts: ^6.1.0
   
   # Cámara y galería
-  camera: ^0.11.1
+  camera: ^0.10.5+5  # Cambiado desde 0.11.1 para compatibilidad con Gradle
   image_picker: ^1.0.4
   
   # IA y procesamiento de imágenes
