@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../../domain/models/analysis_result.dart';
+import '../../../analysis/domain/models/analysis_result.dart';
 
 class HistoryProvider extends ChangeNotifier {
   final List<AnalysisResult> _history = [];

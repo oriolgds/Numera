@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../widgets/home_action_button.dart';
 import '../../../analysis/presentation/pages/analysis_page.dart';
+import '../../../analysis/presentation/providers/analysis_provider.dart';
 import '../../../history/presentation/pages/history_page.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 
@@ -16,9 +18,9 @@ class HomePage extends StatelessWidget {
         title: Text(
           'Numera',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -44,6 +46,53 @@ class HomePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Indicador de estado del modelo
+            Consumer<AnalysisProvider>(
+              builder: (context, provider, _) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: provider.isModelInitialized
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: provider.isModelInitialized
+                          ? Colors.green.withOpacity(0.3)
+                          : Colors.orange.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        provider.isModelInitialized
+                            ? Icons.check_circle_outline
+                            : Icons.hourglass_empty,
+                        size: 16,
+                        color: provider.isModelInitialized
+                            ? Colors.green
+                            : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        provider.isModelInitialized
+                            ? 'IA lista para uso'
+                            : 'Inicializando IA...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: provider.isModelInitialized
+                                  ? Colors.green
+                                  : Colors.orange,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 32),
             Icon(
               Icons.camera_alt_outlined,
               size: 120,
@@ -53,16 +102,19 @@ class HomePage extends StatelessWidget {
             Text(
               'Cuenta objetos con IA',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Text(
               'Toma una foto o carga una imagen para contar y clasificar objetos automáticamente',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.7),
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 48),
@@ -91,7 +143,7 @@ class HomePage extends StatelessWidget {
       source: source,
       imageQuality: 80,
     );
-    
+
     if (image != null && context.mounted) {
       Navigator.push(
         context,
