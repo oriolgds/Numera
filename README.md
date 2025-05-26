@@ -103,54 +103,27 @@ lib/
 
 ## 🤖 Integración de IA
 
-La aplicación está preparada para integrar modelos de TensorFlow Lite:
+La aplicación utiliza TensorFlow Lite para **detectar y contar objetos individuales** en tiempo real:
 
-1. **Coloca tu modelo** en `assets/models/`
-2. **Actualiza** `pubspec.yaml` para incluir el modelo
-3. **Implementa** la lógica de inferencia en `AnalysisProvider`
+1. **Coloca tu modelo** en `assets/models/detect.tflite`
+2. **Incluye el labelmap** en `assets/models/labelmap.txt`
+3. **Actualiza** `pubspec.yaml` para incluir los archivos del modelo
+4. **El procesamiento** se realiza completamente offline usando modelos SSD
 
-### Modelos compatibles
-- COCO SSD (detección de objetos general)
-- YOLOv5/YOLOv8 (optimizados para TFLite)
-- Modelos personalizados entrenados
+### Modelos compatibles y recomendados
+- **COCO SSD MobileNet** (detección de objetos con bounding boxes)
+- **YOLOv5/YOLOv8** convertidos a TensorFlow Lite
+- **Modelos SSD personalizados** para casos específicos (conteo de inventario, etc.)
+
+### Funcionamiento de la detección
+- Cada objeto detectado cuenta como **1 unidad individual**
+- Se muestran **bounding boxes** alrededor de cada objeto detectado
+- **Filtrado por confianza** para evitar falsos positivos
+- **Agrupación por categorías** con conteo automático
 
 ## 📱 Pantallas
 
-1. **🏠 Home**: Captura de foto o carga de imagen
-2. **🔍 Análisis**: Procesamiento y resultados en tiempo real
-3. **📋 Historial**: Lista de análisis anteriores
-4. **⚙️ Configuración**: Ajustes de la aplicación
-
-## 🎯 Roadmap
-
-- [ ] **v1.1**: Integración con modelo COCO SSD
-- [ ] **v1.2**: Detección con bounding boxes visuales
-- [ ] **v1.3**: Exportación de resultados (PDF/CSV)
-- [ ] **v1.4**: Medición estimada de objetos
-- [ ] **v2.0**: Entrenamiento de modelos personalizados
-
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Distribuido bajo la licencia MIT. Ver `LICENSE` para más información.
-
-## 👨‍💻 Desarrollador
-
-**Oriol García** - [@oriolgds](https://github.com/oriolgds)
-
-## 🙏 Agradecimientos
-
-- [Flutter Team](https://flutter.dev/) por el framework
-- [TensorFlow](https://tensorflow.org/) por los modelos de IA
-- [Material Design](https://material.io/) por las guías de diseño
-
----
-
-⭐ **¡Dale una estrella si te gusta el proyecto!**
+1. **🏠 Home**: Captura de foto o carga de imagen para análisis
+2. **🔍 Análisis**: Procesamiento con detección individual de objetos y bounding boxes
+3. **📋 Historial**: Lista de análisis anteriores con conteos detallados
+4. **⚙️ Configuración**: Ajustes de confianza y categorías de detección

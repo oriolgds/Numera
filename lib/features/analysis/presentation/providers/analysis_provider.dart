@@ -53,11 +53,11 @@ class AnalysisProvider extends ChangeNotifier {
 
       print('🔍 Iniciando análisis de imagen: $imagePath');
 
-      // Usar TensorFlow Lite para análisis real
+      // Usar TensorFlow Lite para detectar objetos individuales
       final detections = await _tfliteService.detectObjects(imagePath);
-      print('🔍 Detecciones obtenidas: ${detections.length}');
+      print('🔍 Objetos detectados individualmente: ${detections.length}');
 
-      // Contar objetos por categoría
+      // Contar objetos por categoría (cada detección es un objeto)
       final objectCounts = _tfliteService.countObjectsByCategory(detections);
 
       // Convertir a formato DetectedObject
@@ -74,14 +74,13 @@ class AnalysisProvider extends ChangeNotifier {
 
         return DetectedObject(
           className: _translateClassName(entry.key),
-          count: entry.value,
+          count: entry.value, // Cada detección cuenta como un objeto
           confidence: avgConfidence,
         );
       }).toList();
 
-      // Calcular total
-      final totalCount =
-          detectedObjects.fold<int>(0, (sum, obj) => sum + obj.count);
+      // Calcular total de objetos individuales detectados
+      final totalCount = detections.length; // Total de objetos detectados
 
       _result = AnalysisResult(
         totalCount: totalCount,
@@ -90,7 +89,8 @@ class AnalysisProvider extends ChangeNotifier {
         analysisDate: DateTime.now(),
       );
 
-      print('✅ Análisis completado: $totalCount objetos detectados');
+      print(
+          '✅ Análisis completado: $totalCount objetos detectados individualmente');
     } catch (e) {
       _error = 'Error al analizar la imagen: $e';
       print('❌ Error en análisis: $_error');
