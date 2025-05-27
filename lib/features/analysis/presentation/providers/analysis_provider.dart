@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'dart:async';
 import '../../domain/models/analysis_result.dart';
 import '../../../../core/services/tflite_service.dart';
 
@@ -51,10 +53,18 @@ class AnalysisProvider extends ChangeNotifier {
         }
       }
 
+      // Añadir validación de imagen
+      if (!await File(imagePath).exists()) {
+        throw Exception('La imagen no existe en la ruta especificada');
+      }
+
       print('🔍 Iniciando análisis de imagen: $imagePath');
 
-      // Usar TensorFlow Lite para detectar objetos individuales
-      final detections = await _tfliteService.detectObjects(imagePath);
+      // Agregar timeout para evitar bloqueos
+      final detections = await _tfliteService
+          .detectObjects(imagePath)
+          .timeout(const Duration(seconds: 30));
+
       print('🔍 Objetos detectados individualmente: ${detections.length}');
 
       // Contar objetos por categoría (cada detección es un objeto)
@@ -92,7 +102,18 @@ class AnalysisProvider extends ChangeNotifier {
       print(
           '✅ Análisis completado: $totalCount objetos detectados individualmente');
     } catch (e) {
-      _error = 'Error al analizar la imagen: $e';
+      String errorMessage = 'Error al analizar la imagen: ';
+      if (e.toString().contains('shape mismatch')) {
+        errorMessage +=
+            'Error de configuración del modelo. Por favor, reinicia la aplicación.';
+      } else if (e is TimeoutException) {
+        errorMessage +=
+            'El análisis tardó demasiado. Por favor, intenta con otra imagen.';
+      } else {
+        errorMessage += e.toString();
+      }
+
+      _error = errorMessage;
       print('❌ Error en análisis: $_error');
     } finally {
       _isLoading = false;

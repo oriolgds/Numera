@@ -4,16 +4,18 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 
 class TFLiteService {
-  static const String _modelPath = 'assets/models/detect.tflite';
+  static const String _modelPath =
+      'assets/models/efficientdet-tflite-lite0-detection-default-v1/1.tflite';
   static const String _labelsPath = 'assets/models/labelmap.txt';
 
   Interpreter? _interpreter;
   List<String>? _labels;
 
-  // Configuración del modelo COCO SSD MobileNet
-  static const int _inputSize = 300;
+  // Configuración del modelo EfficientDet-Lite0
+  static const int _inputSize = 320; // EfficientDet usa 320x320
   static const int _numClasses = 90;
-  static const int _numBoxes = 10; // Basado en el error: [1, 10, 4]
+  static const int _numBoxes =
+      25; // Cambiado de 100 a 25 para coincidir con la salida del modelo
 
   bool get isModelLoaded => _interpreter != null && _labels != null;
 
@@ -76,8 +78,7 @@ class TFLiteService {
       // Convertir a formato Uint8 con dimensión de batch
       final input = _imageToByteListUint8(resizedImage);
 
-      // Preparar outputs corregidos basados en el error del modelo
-      // El modelo devuelve: [1, 10, 4] para locations
+      // Ajustar las dimensiones de salida
       final outputLocations = List.generate(
           1, (index) => List.generate(_numBoxes, (i) => List.filled(4, 0.0)));
       final outputClasses =
@@ -93,8 +94,18 @@ class TFLiteService {
         3: numDetections,
       };
 
-      // Ejecutar inferencia
-      _interpreter!.runForMultipleInputs([input], outputs);
+      // Añadir manejo de errores más específico
+      try {
+        // Ejecutar inferencia
+        _interpreter!.runForMultipleInputs([input], outputs);
+      } catch (e) {
+        print('Error durante la inferencia: $e');
+        if (e.toString().contains('shape mismatch')) {
+          throw Exception(
+              'Error de formato en la salida del modelo. Por favor, verifica la configuración del modelo.');
+        }
+        rethrow;
+      }
 
       // Procesar resultados con formato corregido
       return _processDetections(
@@ -109,18 +120,18 @@ class TFLiteService {
     }
   }
 
-  /// Convierte imagen a formato Uint8List con dimensión de batch [1, 300, 300, 3]
+  /// Convierte imagen a formato Uint8List con dimensión de batch [1, 320, 320, 3]
   Uint8List _imageToByteListUint8(img.Image image) {
-    // Crear buffer para tensor 4D: [batch, height, width, channels]
     final bytes = Uint8List(1 * _inputSize * _inputSize * 3);
     int pixelIndex = 0;
 
+    // Normalizar valores entre 0-255 para EfficientDet
     for (int h = 0; h < _inputSize; h++) {
       for (int w = 0; w < _inputSize; w++) {
         final pixel = image.getPixel(w, h);
-        bytes[pixelIndex++] = pixel.r.toInt(); // Red
-        bytes[pixelIndex++] = pixel.g.toInt(); // Green
-        bytes[pixelIndex++] = pixel.b.toInt(); // Blue
+        bytes[pixelIndex++] = pixel.r.toInt();
+        bytes[pixelIndex++] = pixel.g.toInt();
+        bytes[pixelIndex++] = pixel.b.toInt();
       }
     }
 
@@ -129,14 +140,13 @@ class TFLiteService {
 
   /// Procesa las detecciones y filtra por confianza
   List<Detection> _processDetections(
-    List<List<double>> locations, // Cambiado para manejar [10, 4]
+    List<List<double>> locations,
     List<double> classes,
     List<double> scores,
     int numDetections,
   ) {
     final detections = <Detection>[];
-    const double confidenceThreshold =
-        0.3; // Reducido para detectar más objetos
+    const double confidenceThreshold = 0.35; // Ajustado para EfficientDet
 
     final actualDetections = numDetections.clamp(0, _numBoxes);
     print('Procesando $actualDetections detecciones de $scores');

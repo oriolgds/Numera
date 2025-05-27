@@ -42,6 +42,7 @@ flutter:
   assets:
     - assets/images/
     - assets/models/
+    - assets/models/efficientdet-tflite-lite0-detection-default-v1/
 
 flutter_launcher_icons:
   android: true
