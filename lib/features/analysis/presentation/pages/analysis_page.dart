@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/analysis_provider.dart';
 import '../widgets/analysis_result_card.dart';
+import '../widgets/detection_painter.dart';
 
 class AnalysisPage extends StatefulWidget {
   final String imagePath;
@@ -53,10 +54,32 @@ class _AnalysisPageState extends State<AnalysisPage> {
             Card(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.file(
-                  File(widget.imagePath),
-                  fit: BoxFit.cover,
-                  height: 300,
+                child: Stack(
+                  children: [
+                    Image.file(
+                      File(widget.imagePath),
+                      fit: BoxFit.cover,
+                      height: 300,
+                    ),
+                    Consumer<AnalysisProvider>(
+                      builder: (context, provider, _) {
+                        if (provider.result?.boundingBoxes != null) {
+                          return Positioned.fill(
+                            child: CustomPaint(
+                              painter: DetectionPainter(
+                                boxes: provider.result!.boundingBoxes!,
+                                originalImageSize: Size(
+                                  provider.imageSize?.width ?? 300,
+                                  provider.imageSize?.height ?? 300,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),

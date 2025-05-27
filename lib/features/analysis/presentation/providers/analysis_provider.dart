@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
+import 'package:flutter/widgets.dart';
 import '../../domain/models/analysis_result.dart';
 import '../../../../core/services/tflite_service.dart';
 
@@ -39,10 +42,14 @@ class AnalysisProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Size? _imageSize;
+  Size? get imageSize => _imageSize;
+
   Future<void> analyzeImage(String imagePath) async {
     _isLoading = true;
     _error = null;
     _result = null;
+    _imageSize = null;
     notifyListeners();
 
     try {
@@ -60,12 +67,23 @@ class AnalysisProvider extends ChangeNotifier {
 
       print('🔍 Iniciando análisis de imagen: $imagePath');
 
-      // Agregar timeout para evitar bloqueos
+      // Obtener dimensiones de la imagen original
+      final image = await decodeImageFromList(File(imagePath).readAsBytesSync());
+      _imageSize = Size(image.width.toDouble(), image.height.toDouble());
+
       final detections = await _tfliteService
           .detectObjects(imagePath)
           .timeout(const Duration(seconds: 30));
 
-      print('🔍 Objetos detectados individualmente: ${detections.length}');
+      // Convertir detecciones a bounding boxes
+      final boundingBoxes = detections.map((d) => ObjectBoundingBox(
+            className: d.className,
+            x: d.boundingBox.left,
+            y: d.boundingBox.top,
+            width: d.boundingBox.width,
+            height: d.boundingBox.height,
+            confidence: d.confidence,
+          )).toList();
 
       // Contar objetos por categoría (cada detección es un objeto)
       final objectCounts = _tfliteService.countObjectsByCategory(detections);
@@ -97,6 +115,7 @@ class AnalysisProvider extends ChangeNotifier {
         detectedObjects: detectedObjects,
         imagePath: imagePath,
         analysisDate: DateTime.now(),
+        boundingBoxes: boundingBoxes, // Añadir las bounding boxes
       );
 
       print(
