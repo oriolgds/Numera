@@ -1,83 +1,147 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:numera/models/segmentation_result.dart';
+import 'package:image/image.dart' as img;
+
+import '../models/segmentation_result.dart';
+import 'sam_model.dart';
 
 class ObjectSegmentationService {
-  // En una implementación real, aquí cargaríamos el modelo SAM
-  // y lo utilizaríamos para la segmentación
+  final SAMModelService _samService = SAMModelService();
+  
+  // Track the current image being processed
+  File? _currentImageFile;
+  Size? _currentImageSize;
+  
+  // Track the current segmentation results
+  List<SegmentationResult> _currentResults = [];
+  
+  // Track the current prompt points
+  final List<Offset> _currentPromptPoints = [];
+  
+  // Stream controller for segmentation results
+  final StreamController<List<SegmentationResult>> _resultsController = 
+      StreamController<List<SegmentationResult>>.broadcast();
+  
+  // Stream of segmentation results
+  Stream<List<SegmentationResult>> get resultsStream => _resultsController.stream;
+  
+  // Get the current value of the stream or an empty list
+  List<SegmentationResult> get currentResults => _currentResults;
+  
+  /// Adds a prompt point and updates the segmentation
+  Future<void> addPromptPoint(Offset point) async {
+    if (_currentImageFile == null || _currentImageSize == null) {
+      throw Exception('No image loaded');
+    }
+
+    _currentPromptPoints.add(point);
+    
+    try {
+      // Get segmentation results for the new points
+      final results = await _samService.segmentImage(
+        _currentImageFile!,
+        _currentPromptPoints,
+        _currentImageSize!,
+      );
+      
+      // Update current results
+      _currentResults = List.from(results);
+      
+      // Notify listeners
+      _resultsController.add(_currentResults);
+    } catch (e) {
+      debugPrint('Error in addPromptPoint: $e');
+      rethrow;
+    }
+  }
+  
+  // Track if the service is initialized
+  bool _isInitialized = false;
+
+  Future<void> initialize() async {
+    if (!_isInitialized) {
+      await _samService.initialize();
+      _isInitialized = true;
+    }
+  }
+
+  Future<List<SegmentationResult>> processImage(
+    File imageFile, {
+    Size? imageSize,
+  }) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    _currentImageFile = imageFile;
+    _currentImageSize = imageSize;
+    
+    // Get image dimensions if not provided
+    if (_currentImageSize == null) {
+      final image = img.decodeImage(await imageFile.readAsBytes());
+      if (image != null) {
+        _currentImageSize = Size(image.width.toDouble(), image.height.toDouble());
+      } else {
+        throw Exception('Failed to decode image');
+      }
+    }
+    
+    // Clear previous results and points
+    _currentResults.clear();
+    _currentPromptPoints.clear();
+    
+    // Notify listeners that results have been updated
+    _resultsController.add(_currentResults);
+    
+    return _currentResults;
+  }
 
   Future<List<SegmentationResult>> segmentImage(
     File imageFile,
-    List<Offset> promptPoints,
-  ) async {
-    // Simulamos la segmentación de objetos
-    // Añadimos un pequeño retraso para simular el procesamiento
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Generamos resultados simulados basados en los puntos de marcado
-    final results = <SegmentationResult>[];
-    
-    for (int i = 0; i < promptPoints.length; i += 5) {
-      if (i >= promptPoints.length) break;
-      
-      // Tomamos un punto como centro y generamos un contorno alrededor
-      final centerPoint = promptPoints[i];
-      
-      // Tamaño aleatorio para el objeto
-      final size = 30.0 + math.Random().nextDouble() * 70.0;
-      
-      // Creamos un path para simular un contorno irregular
-      final path = Path();
-      
-      // Generamos un polígono irregular
-      final numPoints = 5 + math.Random().nextInt(7); // Entre 5 y 11 puntos
-      
-      for (int j = 0; j < numPoints; j++) {
-        final angle = 2 * math.pi * j / numPoints;
-        final variance = 0.2 + math.Random().nextDouble() * 0.8; // Varianza en el radio
-        final radius = size * variance;
-        
-        final x = centerPoint.dx + radius * math.cos(angle);
-        final y = centerPoint.dy + radius * math.sin(angle);
-        
-        if (j == 0) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
-      }
-      
-      path.close();
-      
-      // Agregamos el resultado a la lista
-      results.add(
-        SegmentationResult(
-          contour: path,
-          center: centerPoint,
-          confidence: 0.7 + math.Random().nextDouble() * 0.3, // Confianza aleatoria entre 0.7 y 1.0
-        ),
-      );
+    List<Offset> promptPoints, {
+    Size? imageSize,
+  }) async {
+    if (!_isInitialized) {
+      await initialize();
     }
-    
-    return results;
-  }
-  
-  // Implementación real con SAM
-  Future<void> initializeModel() async {
-    // Aquí cargaríamos el modelo SAM desde los assets
-    // En una implementación real, esto podría ser algo como:
-    // final modelFile = await _getModelFile();
-    // model = await sam.Model.fromFile(modelFile.path);
-  }
-  
-  // Nota: Los métodos de preprocesamiento y conversión de puntos se implementarán
-  // cuando se integre el modelo SAM real
-}
 
-class Point<T extends num> {
-  final T x;
-  final T y;
-  
-  Point(this.x, this.y);
+    if (promptPoints.isEmpty) {
+      return [];
+    }
+
+    try {
+      // Process the image
+      await processImage(imageFile, imageSize: imageSize);
+      
+      // Ensure we have a valid image size
+      if (_currentImageSize == null) {
+        throw Exception('Image size not available');
+      }
+
+      // Use SAM model for segmentation
+      final results = await _samService.segmentImage(
+        _currentImageFile!,
+        promptPoints,
+        _currentImageSize!,
+      );
+
+      _currentResults = List.from(results);
+      
+      // Notify listeners that results have been updated
+      _resultsController.add(_currentResults);
+      
+      return _currentResults;
+    } catch (e) {
+      debugPrint('Error in segmentImage: $e');
+      rethrow;
+    }
+  }
+
+  void dispose() {
+    _samService.dispose();
+    _isInitialized = false;
+  }
 }

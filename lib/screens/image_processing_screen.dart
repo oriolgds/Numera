@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:numera/widgets/segmentation_painter.dart';
@@ -14,36 +15,96 @@ class ImageProcessingScreen extends StatefulWidget {
 }
 
 class _ImageProcessingScreenState extends State<ImageProcessingScreen> {
-  late Image _image;
   bool _isLoading = true;
   bool _isProcessing = false;
   int _objectCount = 0;
   List<Offset> _brushPoints = [];
-  final ObjectSegmentationService _segmentationService =
-      ObjectSegmentationService();
+  final ObjectSegmentationService _segmentationService = ObjectSegmentationService();
   List<SegmentationResult> _segmentationResults = [];
   bool _isSegmentationMode = true;
   bool _isEraseMode = false;
+  Completer<ImageInfo>? _imageInfoCompleter;
 
   @override
   void initState() {
     super.initState();
-    _loadImage();
+    _initializeServices();
+  }
+
+  @override
+  void dispose() {
+    _segmentationService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await _segmentationService.initialize();
+      await _loadImage();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error initializing services: $e')),
+        );
+      }
+    }
+  }
+
+  Future<ImageInfo?> _getImageInfo() async {
+    if (_imageInfoCompleter != null && !_imageInfoCompleter!.isCompleted) {
+      return _imageInfoCompleter!.future;
+    }
+
+    _imageInfoCompleter = Completer<ImageInfo>();
+    final image = Image.file(widget.imageFile);
+    
+    final ImageStream stream = image.image.resolve(const ImageConfiguration());
+    
+    final listener = ImageStreamListener((ImageInfo info, bool _) {
+      if (!_imageInfoCompleter!.isCompleted) {
+        _imageInfoCompleter!.complete(info);
+      }
+    });
+    
+    stream.addListener(listener);
+    
+    // Add a timeout to prevent hanging
+    return _imageInfoCompleter!.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        stream.removeListener(listener);
+        throw TimeoutException('Failed to load image info');
+      },
+    ).whenComplete(() => stream.removeListener(listener));
   }
 
   Future<void> _loadImage() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
 
-    _image = Image.file(widget.imageFile);
-    _image.image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener((info, _) {
+    try {
+      // Trigger image info loading
+      await _getImageInfo();
+      
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
-      }),
-    );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar la imagen: $e')),
+        );
+      }
+    }
   }
 
   void _addBrushPoint(Offset point) {
@@ -66,48 +127,102 @@ class _ImageProcessingScreenState extends State<ImageProcessingScreen> {
 
   Future<void> _segmentObjects() async {
     if (_brushPoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Marca con el pincel donde están los objetos')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please mark the objects with the brush'),
+          ),
+        );
+      }
       return;
     }
 
+    if (!mounted) return;
+    
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      // Aquí utilizaríamos SAM para segmentar los objetos
-      // Por ahora simularemos algunos resultados
-      final results = await _segmentationService.segmentImage(
+      // Get the image size for proper point scaling
+      final imageInfo = await _getImageInfo();
+      if (imageInfo == null) {
+        throw Exception('Could not get image information');
+      }
+
+      // Filter out any invalid points
+      final validPoints = _brushPoints.where((p) => p != Offset.infinite).toList();
+      
+      if (validPoints.isEmpty) {
+        throw Exception('No valid points provided for segmentation');
+      }
+
+      // Process the image first
+      await _segmentationService.processImage(
         widget.imageFile,
-        _brushPoints,
+        imageSize: Size(
+          imageInfo.image.width.toDouble(),
+          imageInfo.image.height.toDouble(),
+        ),
       );
 
+      // Add each point individually to see the segmentation update
+      for (final point in validPoints) {
+        await _segmentationService.addPromptPoint(point);
+      }
+
+      if (!mounted) return;
+      
+      // Get the final results from the service
+      final results = _segmentationService.currentResults;
+      
       setState(() {
-        _segmentationResults = results;
+        _segmentationResults = List.from(results);
         _objectCount = results.length;
         _isProcessing = false;
         _clearBrushPoints();
       });
     } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al procesar imagen: $e')),
-      );
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error processing image: $e')),
+        );
+      }
     }
   }
 
-  void _resetSegmentation() {
-    setState(() {
-      _segmentationResults = [];
-      _objectCount = 0;
-      _clearBrushPoints();
-    });
+  Future<void> _resetSegmentation() async {
+    try {
+      // Get the current image size from the existing results if available
+      Size? imageSize;
+      if (_segmentationService.currentResults.isNotEmpty) {
+        try {
+          final bounds = _segmentationService.currentResults.first.contour.getBounds();
+          imageSize = bounds.size;
+        } catch (e) {
+          debugPrint('Error getting bounds: $e');
+        }
+      }
+      
+      await _segmentationService.processImage(
+        widget.imageFile,
+        imageSize: imageSize,
+      );
+    } catch (e) {
+      debugPrint('Error resetting segmentation: $e');
+    }
+    
+    if (mounted) {
+      setState(() {
+        _segmentationResults = [];
+        _objectCount = 0;
+        _clearBrushPoints();
+      });
+    }
   }
 
   void _toggleDrawMode() {
